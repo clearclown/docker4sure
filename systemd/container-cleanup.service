@@ -1,0 +1,6 @@
+[Unit]
+Description=Container image cleanup service
+
+[Service]
+Type=oneshot
+ExecStart=%h/.containers/scripts/cleanup.sh

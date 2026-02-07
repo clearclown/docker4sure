@@ -1,0 +1,11 @@
+version: "3.8"
+
+services:
+  port-monitor:
+    image: docker.io/library/python:3.12-alpine
+    container_name: port-monitor
+    restart: always
+    network_mode: host
+    volumes:
+      - ${SCRIPTS_DIR:-~/.containers/scripts}/port-monitor.sh:/app/port-monitor.sh:ro
+    command: ["python3", "/app/port-monitor.sh"]

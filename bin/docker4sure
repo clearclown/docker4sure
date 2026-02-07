@@ -1,0 +1,27 @@
+#!/bin/bash
+# docker4sure: Execute the real Docker binary directly
+set -euo pipefail
+
+DOCKER_BIN="/usr/bin/docker"
+
+# On macOS, Docker Desktop installs to a different path
+if [[ "$(uname -s)" == "Darwin" ]]; then
+    if [[ -x "/usr/local/bin/docker" ]]; then
+        DOCKER_BIN="/usr/local/bin/docker"
+    elif [[ -x "/opt/homebrew/bin/docker" ]]; then
+        DOCKER_BIN="/opt/homebrew/bin/docker"
+    fi
+fi
+
+if [[ ! -x "$DOCKER_BIN" ]]; then
+    echo "Error: Real Docker binary not found at $DOCKER_BIN" >&2
+    echo "Install Docker or adjust DOCKER_BIN path." >&2
+    exit 1
+fi
+
+# Handle 'docker4sure compose ...' → 'docker compose ...'
+if [[ "${1:-}" == "compose" ]]; then
+    exec "$DOCKER_BIN" compose "$@"
+fi
+
+exec "$DOCKER_BIN" "$@"

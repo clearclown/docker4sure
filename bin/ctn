@@ -1,0 +1,170 @@
+#!/bin/bash
+# docker4sure: Container management convenience command
+set -euo pipefail
+
+COMPOSE_DIR="$HOME/.containers/compose"
+DATA_DIR="$HOME/.containers/data"
+
+# Colors
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
+CYAN='\033[0;36m'
+NC='\033[0m'
+
+usage() {
+    cat <<'EOF'
+Usage: ctn <command>
+
+Commands:
+  up          Start all container services
+  down        Stop all container services
+  restart     Restart all services (down + up)
+  status      Show service status and disk usage
+  logs        Follow service logs
+  clean       Safe cleanup (running containers protected)
+  nuke        Remove all containers/images (bind mount data is safe)
+  rebuild     Full rebuild (nuke + up)
+  ports       Show port usage on all hosts
+  help        Show this help message
+EOF
+}
+
+cmd_up() {
+    echo -e "${GREEN}Starting container services...${NC}"
+    cd "$COMPOSE_DIR"
+
+    local compose_args=()
+    for f in *.yml; do
+        [[ -f "$f" ]] && compose_args+=("-f" "$f")
+    done
+
+    if [[ ${#compose_args[@]} -eq 0 ]]; then
+        echo -e "${RED}No compose files found in $COMPOSE_DIR${NC}" >&2
+        exit 1
+    fi
+
+    podman-compose "${compose_args[@]}" up -d
+    echo -e "${GREEN}All services started.${NC}"
+}
+
+cmd_down() {
+    echo -e "${YELLOW}Stopping container services...${NC}"
+    cd "$COMPOSE_DIR"
+
+    local compose_args=()
+    for f in *.yml; do
+        [[ -f "$f" ]] && compose_args+=("-f" "$f")
+    done
+
+    if [[ ${#compose_args[@]} -eq 0 ]]; then
+        echo -e "${RED}No compose files found in $COMPOSE_DIR${NC}" >&2
+        exit 1
+    fi
+
+    podman-compose "${compose_args[@]}" down
+    echo -e "${YELLOW}All services stopped.${NC}"
+}
+
+cmd_restart() {
+    cmd_down
+    cmd_up
+}
+
+cmd_status() {
+    echo -e "${BLUE}=== Container Status ===${NC}"
+    podman ps -a --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}\t{{.Image}}"
+
+    echo ""
+    echo -e "${BLUE}=== Disk Usage ===${NC}"
+    podman system df
+
+    echo ""
+    echo -e "${BLUE}=== Data Directory Sizes ===${NC}"
+    if [[ -d "$DATA_DIR" ]]; then
+        du -sh "$DATA_DIR"/*/ 2>/dev/null || echo "  (no data directories)"
+    fi
+}
+
+cmd_logs() {
+    cd "$COMPOSE_DIR"
+
+    local compose_args=()
+    for f in *.yml; do
+        [[ -f "$f" ]] && compose_args+=("-f" "$f")
+    done
+
+    podman-compose "${compose_args[@]}" logs -f "$@"
+}
+
+cmd_clean() {
+    echo -e "${YELLOW}Running safe cleanup (running containers protected)...${NC}"
+    podman image prune -f
+    podman container prune -f
+    podman volume prune -f
+    echo -e "${GREEN}Cleanup complete.${NC}"
+    podman system df
+}
+
+cmd_nuke() {
+    echo -e "${RED}WARNING: This will remove ALL containers, images, and volumes.${NC}"
+    echo -e "${GREEN}Data in ~/.containers/data/ is safe (bind mounts).${NC}"
+    echo ""
+    read -rp "Continue? [y/N] " confirm
+    if [[ "$confirm" =~ ^[Yy]$ ]]; then
+        podman system prune -af --volumes
+        echo -e "${GREEN}System pruned. Data directories preserved.${NC}"
+    else
+        echo "Cancelled."
+    fi
+}
+
+cmd_rebuild() {
+    echo -e "${CYAN}Full rebuild: nuke + up${NC}"
+    # Force nuke without interactive prompt
+    podman system prune -af --volumes
+    echo -e "${GREEN}System pruned. Rebuilding...${NC}"
+    cmd_up
+}
+
+cmd_ports() {
+    echo -e "${BLUE}=== Port Usage (Local) ===${NC}"
+    ss -tlnp 2>/dev/null | head -30
+
+    echo ""
+    echo -e "${BLUE}=== Remote Hosts ===${NC}"
+
+    local hosts=(
+        "100.107.30.86:asusrogflowx13mint"
+        "100.83.54.6:ablazemacbook-air-m4"
+        "100.82.83.122:hp-laptop-kali-linux"
+    )
+
+    for entry in "${hosts[@]}"; do
+        local ip="${entry%%:*}"
+        local name="${entry##*:}"
+        echo -e "${CYAN}--- $name ($ip) ---${NC}"
+        curl -s --connect-timeout 3 "http://${ip}:9999/ports" 2>/dev/null || echo "  (port-monitor not available)"
+        echo ""
+    done
+}
+
+# Main dispatch
+case "${1:-help}" in
+    up)       cmd_up ;;
+    down)     cmd_down ;;
+    restart)  cmd_restart ;;
+    status)   cmd_status ;;
+    logs)     shift; cmd_logs "$@" ;;
+    clean)    cmd_clean ;;
+    nuke)     cmd_nuke ;;
+    rebuild)  cmd_rebuild ;;
+    ports)    cmd_ports ;;
+    help|-h|--help) usage ;;
+    *)
+        echo -e "${RED}Unknown command: $1${NC}" >&2
+        usage >&2
+        exit 1
+        ;;
+esac

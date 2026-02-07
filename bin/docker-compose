@@ -1,0 +1,4 @@
+#!/bin/bash
+# docker4sure: Docker Compose to Podman Compose redirect wrapper
+set -euo pipefail
+exec podman-compose "$@"

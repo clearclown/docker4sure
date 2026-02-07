@@ -1,0 +1,16 @@
+version: "3.8"
+
+services:
+  open-webui:
+    image: ghcr.io/open-webui/open-webui:main
+    container_name: open-webui
+    restart: always
+    ports:
+      - "3000:8080"
+    environment:
+      - OPENAI_API_BASE_URLS=${LM_STUDIO_URL:-http://host.containers.internal:1234/v1}
+      - OPENAI_API_KEYS=${LM_STUDIO_KEY:-lm-studio}
+      - WEBUI_AUTH=${WEBUI_AUTH:-false}
+    volumes:
+      - ${DATA_DIR:-~/.containers/data}/open-webui:/app/backend/data
+    network_mode: "slirp4netns:allow_host_loopback=true"

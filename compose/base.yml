@@ -1,0 +1,13 @@
+version: "3.8"
+
+services:
+  portainer:
+    image: portainer/portainer-ce:lts
+    container_name: portainer
+    restart: always
+    ports:
+      - "9443:9443"
+      - "8000:8000"
+    volumes:
+      - ${PODMAN_SOCKET:-/run/user/1000/podman/podman.sock}:/var/run/docker.sock:ro
+      - ${DATA_DIR:-~/.containers/data}/portainer:/data
