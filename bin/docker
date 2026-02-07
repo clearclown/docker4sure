@@ -6,7 +6,15 @@ set -euo pipefail
 
 # If DOCKER_REAL is set, use the real docker
 if [[ "${DOCKER_REAL:-}" == "1" ]]; then
-    exec /usr/bin/docker "$@"
+    DOCKER_BIN="/usr/bin/docker"
+    if [[ "$(uname -s)" == "Darwin" ]]; then
+        if [[ -x "/usr/local/bin/docker" ]]; then
+            DOCKER_BIN="/usr/local/bin/docker"
+        elif [[ -x "/opt/homebrew/bin/docker" ]]; then
+            DOCKER_BIN="/opt/homebrew/bin/docker"
+        fi
+    fi
+    exec "$DOCKER_BIN" "$@"
 fi
 
 # Handle 'docker compose' → 'podman-compose'
